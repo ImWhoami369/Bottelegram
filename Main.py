@@ -4,6 +4,27 @@ import logging
 from datetime import datetime
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# ======================================================
+# 1. SERVIDOR DUMMY PARA O RENDER (FIX PORT SCAN)
+# ======================================================
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot Scalper M1 (15 Ativos) Ativo!")
+
+    def log_message(self, format, *args):
+        return
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), DummyHandler)
+    print(f"--> Servidor HTTP iniciado na porta {port}.")
+    server.serve_forever()
+
+threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # ==============================================================================
 # 1. CREDENCIAIS E CONFIGURAÇÕES
