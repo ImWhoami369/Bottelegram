@@ -13,7 +13,7 @@ class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot Scalper M1 Ativo!")
+        self.wfile.write(b"Bot Scalper M1 (15 Ativos) Ativo!")
 
     def log_message(self, format, *args):
         return
@@ -27,15 +27,20 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # ======================================================
-# 2. CONFIGURAÇÕES DO TELEGRAM (SEUS DADOS JÁ INSERIDOS)
+# 2. CONFIGURAÇÕES DO TELEGRAM E LISTA DE 15 ATIVOS
 # ======================================================
 TOKEN = '8822381506:AAEFA9KscOVs_xIGOV70RJeuLPggQNojYXg'
 CHAT_ID = '-1003966783268'
 
-# Pares para chuva de sinais em M1
-SYMBOLS = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'DOGE/USDT', 'XRP/USDT']
+# 15 Ativos de Alta Volatilidade para Chuva de Sinais em M1
+SYMBOLS = [
+    'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'DOGE/USDT', 'XRP/USDT',
+    'ADA/USDT', 'AVAX/USDT', 'LINK/USDT', 'NEAR/USDT', 'PEPE/USDT',
+    'SHIB/USDT', 'SUI/USDT', 'BNB/USDT', 'OP/USDT', 'ARB/USDT'
+]
+
 TIMEFRAME = '1m'
-TS_PCT = 1.0  # Trailing Stop de 1% para Scalper rápido
+TS_PCT = 1.0  # Trailing Stop de 1.0% para Scalper rápido
 
 # Conexão Binance USD-M Futures
 exchange = ccxt.binanceusdm({
@@ -109,8 +114,8 @@ def analisar_e_executar():
                             f"{cor_emoji} <b>OPERAÇÃO ENCERRADA M1</b> | #{hashtag}\n\n"
                             f"📌 <b>Tipo:</b> LONG\n"
                             f"🏁 <b>Resultado:</b> {resultado_str} ({pnl:+.2f}%)\n"
-                            f"📥 <b>Entrada:</b> ${pos['entrada']:.4f}\n"
-                            f"📤 <b>Saída:</b> ${pos['ts_price']:.4f}"
+                            f"📥 <b>Entrada:</b> ${pos['entrada']:.6f}\n"
+                            f"📤 <b>Saída:</b> ${pos['ts_price']:.6f}"
                         )
                         enviar_telegram(msg_resultado)
                         pos['ativa'] = False
@@ -128,13 +133,13 @@ def analisar_e_executar():
                             f"{cor_emoji} <b>OPERAÇÃO ENCERRADA M1</b> | #{hashtag}\n\n"
                             f"📌 <b>Tipo:</b> SHORT\n"
                             f"🏁 <b>Resultado:</b> {resultado_str} ({pnl:+.2f}%)\n"
-                            f"📥 <b>Entrada:</b> ${pos['entrada']:.4f}\n"
-                            f"📤 <b>Saída:</b> ${pos['ts_price']:.4f}"
+                            f"📥 <b>Entrada:</b> ${pos['entrada']:.6f}\n"
+                            f"📤 <b>Saída:</b> ${pos['ts_price']:.6f}"
                         )
                         enviar_telegram(msg_resultado)
                         pos['ativa'] = False
 
-            # GERAÇÃO DE NOVOS SINAIS
+            # GERAÇÃO DE NOVOS SINAIS (M1 SCALPER)
             else:
                 cruzou_alta = (penultima['ema_fast'] <= penultima['ema_slow']) and (ultima_fechada['ema_fast'] > ultima_fechada['ema_slow'])
                 cruzou_baixa = (penultima['ema_fast'] >= penultima['ema_slow']) and (ultima_fechada['ema_fast'] < ultima_fechada['ema_slow'])
@@ -148,8 +153,8 @@ def analisar_e_executar():
                     msg_sinal = (
                         f"⚡ <b>SINAL M1 ULTRA SCALPER</b> | #{hashtag}\n\n"
                         f"📊 <b>Direção:</b> 🟢 <b>LONG (COMPRA)</b>\n"
-                        f"💵 <b>Entrada:</b> ${preco_atual:.4f}\n"
-                        f"🛡 <b>Trailing Stop:</b> ${pos['ts_price']:.4f} ({TS_PCT}%)\n\n"
+                        f"💵 <b>Entrada:</b> ${preco_atual:.6f}\n"
+                        f"🛡 <b>Trailing Stop:</b> ${pos['ts_price']:.6f} ({TS_PCT}%)\n\n"
                         f"🔥 <i>EMA 9x21 Cruzou para CIMA | RSI: {ultima_fechada['rsi']:.1f}</i>"
                     )
                     enviar_telegram(msg_sinal)
@@ -163,8 +168,8 @@ def analisar_e_executar():
                     msg_sinal = (
                         f"⚡ <b>SINAL M1 ULTRA SCALPER</b> | #{hashtag}\n\n"
                         f"📊 <b>Direção:</b> 🔴 <b>SHORT (VENDA)</b>\n"
-                        f"💵 <b>Entrada:</b> ${preco_atual:.4f}\n"
-                        f"🛡 <b>Trailing Stop:</b> ${pos['ts_price']:.4f} ({TS_PCT}%)\n\n"
+                        f"💵 <b>Entrada:</b> ${preco_atual:.6f}\n"
+                        f"🛡 <b>Trailing Stop:</b> ${pos['ts_price']:.6f} ({TS_PCT}%)\n\n"
                         f"🔥 <i>EMA 9x21 Cruzou para BAIXO | RSI: {ultima_fechada['rsi']:.1f}</i>"
                     )
                     enviar_telegram(msg_sinal)
@@ -173,12 +178,11 @@ def analisar_e_executar():
             print(f"Erro em {symbol}: {e}")
 
 print("==========================================")
-print("BOT M1 SCALPER INICIADO!")
+print("BOT M1 SCALPER (15 ATIVOS) INICIADO!")
 print("==========================================")
 
-enviar_telegram("⚡ <b>SISTEMA M1 ULTRA SCALPER CONECTADO</b>\n\nMonitorando BTC, ETH, SOL, DOGE e XRP em M1...")
+enviar_telegram("⚡ <b>SISTEMA M1 SCALPER CONECTADO (15 ATIVOS)</b>\n\nMonitorando BTC, ETH, SOL, DOGE, XRP, ADA, AVAX, LINK, NEAR, PEPE, SHIB, SUI, BNB, OP e ARB...")
 
 while True:
     analisar_e_executar()
-    time.sleep(5)
-    
+    time.sleep(3)  # Pausa de 3s entre varreduras completas
