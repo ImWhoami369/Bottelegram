@@ -7,26 +7,6 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# ======================================================
-# 1. SERVIDOR DUMMY PARA O RENDER (FIX PORT SCAN)
-# ======================================================
-class DummyHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot Scalper M1 (15 Ativos) Ativo!")
-
-    def log_message(self, format, *args):
-        return
-
-def run_dummy_server():
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(('0.0.0.0', port), DummyHandler)
-    print(f"--> Servidor HTTP iniciado na porta {port}.")
-    server.serve_forever()
-
-threading.Thread(target=run_dummy_server, daemon=True).start()
-
 # ==============================================================================
 # 1. CREDENCIAIS E CONFIGURAÇÕES
 # ==============================================================================
@@ -237,6 +217,28 @@ def callback_listener(call):
         
         bot.send_message(chat_id, f"✅ **Posição em {symbol_raw} encerrada com sucesso!**", parse_mode="Markdown")
         bot.answer_callback_query(call.id, f"{symbol_raw} Fechado!")
+
+# ======================================================
+# 1. SERVIDOR DUMMY PARA O RENDER (FIX PORT SCAN)
+# ======================================================
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot Scalper M1 (15 Ativos) Ativo!")
+
+    def log_message(self, format, *args):
+        return
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), DummyHandler)
+    print(f"--> Servidor HTTP iniciado na porta {port}.")
+    server.serve_forever()
+
+threading.Thread(target=run_dummy_server, daemon=True).start()
+        
+
 
 # ==============================================================================
 # 7. FUNÇÕES AUXILIARES DE EXIBIÇÃO
