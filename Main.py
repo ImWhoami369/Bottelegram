@@ -16,10 +16,23 @@ bot = telebot.TeleBot(TOKEN)
 # Logging no terminal/Render
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- MOCK DE DADOS (Substitua pela integração da sua corretora/banco de dados) ---
+# --- 15 ATIVOS FIXOS EM POSIÇÕES ABERTAS ---
 POSICOES_ABERTAS = [
     {"symbol": "BTC/USDT", "side": "LONG", "entry": 64200.0, "pnl": "+4.2%", "qty": 0.05},
     {"symbol": "ETH/USDT", "side": "SHORT", "entry": 3450.0, "pnl": "-1.1%", "qty": 0.5},
+    {"symbol": "SOL/USDT", "side": "LONG", "entry": 145.0, "pnl": "+8.5%", "qty": 10.0},
+    {"symbol": "BNB/USDT", "side": "LONG", "entry": 580.0, "pnl": "+2.1%", "qty": 1.5},
+    {"symbol": "XRP/USDT", "side": "SHORT", "entry": 0.55, "pnl": "-0.5%", "qty": 1000.0},
+    {"symbol": "ADA/USDT", "side": "LONG", "entry": 0.42, "pnl": "+1.8%", "qty": 500.0},
+    {"symbol": "DOGE/USDT", "side": "LONG", "entry": 0.12, "pnl": "+15.4%", "qty": 2500.0},
+    {"symbol": "AVAX/USDT", "side": "SHORT", "entry": 28.5, "pnl": "+3.0%", "qty": 15.0},
+    {"symbol": "LINK/USDT", "side": "LONG", "entry": 14.2, "pnl": "-2.4%", "qty": 30.0},
+    {"symbol": "DOT/USDT", "side": "LONG", "entry": 6.8, "pnl": "+0.9%", "qty": 80.0},
+    {"symbol": "NEAR/USDT", "side": "LONG", "entry": 5.1, "pnl": "+6.3%", "qty": 100.0},
+    {"symbol": "MATIC/USDT", "side": "SHORT", "entry": 0.58, "pnl": "-1.8%", "qty": 400.0},
+    {"symbol": "ATOM/USDT", "side": "LONG", "entry": 6.5, "pnl": "+1.2%", "qty": 50.0},
+    {"symbol": "SUI/USDT", "side": "LONG", "entry": 1.15, "pnl": "+11.0%", "qty": 300.0},
+    {"symbol": "CHZ/USDT", "side": "LONG", "entry": 0.08, "pnl": "+4.7%", "qty": 5000.0},
 ]
 
 HISTORICO_HOJE = [
@@ -159,6 +172,8 @@ def command_ajuda(message):
 # ==============================================================================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_listener(call):
+    global POSICOES_ABERTAS  # Correção do escopo global no topo do handler
+    
     chat_id = call.message.chat.id
     message_id = call.message.message_id
 
@@ -196,7 +211,6 @@ def callback_listener(call):
 
     elif call.data.startswith("close_pos_"):
         symbol_raw = call.data.replace("close_pos_", "").replace("_", "/")
-        global POSICOES_ABERTAS
         POSICOES_ABERTAS = [p for p in POSICOES_ABERTAS if p["symbol"] != symbol_raw]
         
         bot.send_message(chat_id, f"✅ **Posição em {symbol_raw} encerrada com sucesso!**", parse_mode="Markdown")
@@ -210,13 +224,12 @@ def exibir_posicoes(chat_id):
         bot.send_message(chat_id, "📊 **POSIÇÕES:**\nNenhuma ordem aberta no momento.")
         return
 
-    texto = "📊 **POSIÇÕES ABERTAS EM TEMPO REAL:**\n\n"
+    texto = f"📊 **POSIÇÕES ABERTAS ({len(POSICOES_ABERTAS)}):**\n\n"
     for idx, pos in enumerate(POSICOES_ABERTAS, 1):
         emoji = "🟢" if pos["side"] == "LONG" else "🔴"
         texto += (
             f"{idx}. {emoji} **{pos['symbol']}** ({pos['side']})\n"
-            f"   • Entrada: `${pos['entry']}`\n"
-            f"   • Qtd: `{pos['qty']}`\n"
+            f"   • Entrada: `${pos['entry']}` | Qtd: `{pos['qty']}`\n"
             f"   • PnL Atual: **{pos['pnl']}**\n\n"
         )
     bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=criar_menu_principal())
