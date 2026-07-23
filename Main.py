@@ -27,22 +27,22 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # ======================================================
-# 2. CONFIGURAÇÕES DO TELEGRAM E LISTA DE 15 ATIVOS
+# 2. CONFIGURAÇÕES DO TELEGRAM E LISTA DE ATIVOS
 # ======================================================
 TOKEN = '8822381506:AAEFA9KscOVs_xIGOV70RJeuLPggQNojYXg'
 CHAT_ID = '-1003966783268'
 
-# 15 Ativos de Alta Volatilidade para Chuva de Sinais em M1
+# Nomes ajustados conforme os padrões do Binance Futures
 SYMBOLS = [
     'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'DOGE/USDT', 'XRP/USDT',
-    'ADA/USDT', 'AVAX/USDT', 'LINK/USDT', 'NEAR/USDT', 'PEPE/USDT',
-    'SHIB/USDT', 'SUI/USDT', 'BNB/USDT', 'OP/USDT', 'ARB/USDT'
+    'ADA/USDT', 'AVAX/USDT', 'LINK/USDT', 'NEAR/USDT', '1000PEPE/USDT',
+    '1000SHIB/USDT', 'SUI/USDT', 'BNB/USDT', 'OP/USDT', 'ARB/USDT'
 ]
 
 TIMEFRAME = '1m'
-TS_PCT = 1.0  # Trailing Stop de 1.0% para Scalper rápido
+TS_PCT = 1.0  # Trailing Stop de 1.0%
 
-# Conexão Binance USD-M Futures
+# Conexão Binance USD-M Futures com rate limit habilitado
 exchange = ccxt.binanceusdm({
     'enableRateLimit': True,
     'options': {'defaultType': 'future'}
@@ -139,7 +139,7 @@ def analisar_e_executar():
                         enviar_telegram(msg_resultado)
                         pos['ativa'] = False
 
-            # GERAÇÃO DE NOVOS SINAIS (M1 SCALPER)
+            # GERAÇÃO DE NOVOS SINAIS
             else:
                 cruzou_alta = (penultima['ema_fast'] <= penultima['ema_slow']) and (ultima_fechada['ema_fast'] > ultima_fechada['ema_slow'])
                 cruzou_baixa = (penultima['ema_fast'] >= penultima['ema_slow']) and (ultima_fechada['ema_fast'] < ultima_fechada['ema_slow'])
@@ -177,12 +177,16 @@ def analisar_e_executar():
         except Exception as e:
             print(f"Erro em {symbol}: {e}")
 
+        # Cadência de 1.2s entre pares para não estourar o limite da API da Binance
+        time.sleep(1.2)
+
 print("==========================================")
-print("BOT M1 SCALPER (15 ATIVOS) INICIADO!")
+print("BOT M1 SCALPER (15 ATIVOS OTIMIZADOS) INICIADO!")
 print("==========================================")
 
-enviar_telegram("⚡ <b>SISTEMA M1 SCALPER CONECTADO (15 ATIVOS)</b>\n\nMonitorando BTC, ETH, SOL, DOGE, XRP, ADA, AVAX, LINK, NEAR, PEPE, SHIB, SUI, BNB, OP e ARB...")
+enviar_telegram("⚡ <b>SISTEMA M1 SCALPER OTIMIZADO</b>\n\nMonitorando 15 pares com cadência suave de requisições...")
 
 while True:
     analisar_e_executar()
-    time.sleep(3)  # Pausa de 3s entre varreduras completas
+    # Pausa de 10 segundos entre cada varredura completa
+    time.sleep(10)
