@@ -17,7 +17,7 @@ SYMBOLS = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
 TIMEFRAME = '1m'
 TS_PCT = 1.5
 
-exchange = ccxt.binanceusdm()
+exchange = ccxt.bybit()
 
 posicoes = {
     symbol: {
