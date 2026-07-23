@@ -1,305 +1,246 @@
 import os
-import time
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import ccxt
-import pandas as pd
-import requests
+import sys
+import logging
+from datetime import datetime
 import telebot
-from telebot import types
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 
-# ======================================================
-# 1. CONFIGURAÇÕES E CHAVES
-# ======================================================
-TOKEN = '8822381506:AAEFA9KscOVs_xIGOV70RJeuLPggQNojYXg'
-CHAT_ID = '-1003966783268'
-RENDER_URL = "https://bottelegram-7-t8el.onrender.com"  # Substitua pela sua URL do Render quando subir
+# ==============================================================================
+# 1. CREDENCIAIS E CONFIGURAÇÕES
+# ==============================================================================
+TOKEN = "8822381506:AAEFA9KscOVs_xIGOV70RJeuLPggQNojYXg"
+CHAT_ID = "-1003966783268"
 
 bot = telebot.TeleBot(TOKEN)
-bot_rodando = True  # Flag global para Pausar/Iniciar varredura
 
-SYMBOLS = [
-    'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'DOGE/USDT', 'XRP/USDT',
-    'ADA/USDT', 'AVAX/USDT', 'LINK/USDT', 'NEAR/USDT', '1000PEPE/USDT',
-    '1000SHIB/USDT', 'SUI/USDT', 'BNB/USDT', 'OP/USDT', 'ARB/USDT'
+# Logging no terminal/Render
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# --- MOCK DE DADOS (Substitua pela integração da sua corretora/banco de dados) ---
+POSICOES_ABERTAS = [
+    {"symbol": "BTC/USDT", "side": "LONG", "entry": 64200.0, "pnl": "+4.2%", "qty": 0.05},
+    {"symbol": "ETH/USDT", "side": "SHORT", "entry": 3450.0, "pnl": "-1.1%", "qty": 0.5},
 ]
 
-TIMEFRAME = '1m'
-TS_PCT = 1.0  # Trailing Stop de 1.0%
+HISTORICO_HOJE = [
+    {"symbol": "SOL/USDT", "side": "LONG", "result": "PROFIT", "pnl": "+12.5%", "lucro_usd": 150.00},
+    {"symbol": "BTC/USDT", "side": "SHORT", "result": "PROFIT", "pnl": "+5.2%", "lucro_usd": 80.50},
+    {"symbol": "BNB/USDT", "side": "LONG", "result": "LOSS", "pnl": "-2.1%", "lucro_usd": -25.00},
+]
 
-exchange = ccxt.binanceusdm({
-    'enableRateLimit': True,
-    'options': {'defaultType': 'future'}
-})
+# ==============================================================================
+# 2. INICIALIZAÇÃO AUTOMÁTICA (Limpa Webhook & Cadastra Menu)
+# ==============================================================================
+def inicializar_bot():
+    try:
+        # Elimina o Erro 409 (Conflict) no Render
+        bot.remove_webhook()
+        logging.info("✅ Webhook antigo removido com sucesso!")
+    except Exception as e:
+        logging.error(f"⚠️ Erro ao remover webhook: {e}")
 
-posicoes = {
-    symbol: {'ativa': False, 'tipo': None, 'entrada': 0.0, 'ts_price': 0.0}
-    for symbol in SYMBOLS
-}
+    try:
+        # Cadastra o menu de comandos direto no aplicativo do Telegram
+        bot.set_my_commands([
+            BotCommand("start", "🚀 Painel Principal"),
+            BotCommand("posicoes", "📊 Posições Abertas"),
+            BotCommand("relatorio", "📈 Relatório Diário"),
+            BotCommand("sinais", "📡 ÚLTIMOS SINAIS"),
+            BotCommand("ajuda", "❓ Instruções e Suporte")
+        ])
+        logging.info("✅ Menu de comandos cadastrado no Telegram!")
+    except Exception as e:
+        logging.error(f"⚠️ Erro ao cadastrar comandos: {e}")
 
-# ======================================================
-# 2. PAINEL INTERATIVO E BOTÕES DO TELEGRAM
-# ======================================================
-
-# Menu Fixo de Comandos
-@bot.message_handler(commands=['start', 'menu'])
-def send_welcome(message):
-    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    btn_status = types.KeyboardButton('📊 Status')
-    btn_posicoes = types.KeyboardButton('📂 Posições Abertas')
-    btn_pausar = types.KeyboardButton('⏸️ Pausar Bot')
-    btn_iniciar = types.KeyboardButton('▶️ Iniciar Bot')
+# ==============================================================================
+# 3. CONSTRUTORES DE MENUS INTERATIVOS (TECLADOS INLINE)
+# ==============================================================================
+def criar_menu_principal():
+    markup = InlineKeyboardMarkup(row_width=2)
     
-    markup.add(btn_status, btn_posicoes, btn_pausar, btn_iniciar)
-    bot.send_message(
-        message.chat.id, 
-        "🤖 <b>PAINEL DE CONTROLE M1 ULTRA SCALPER</b>\n\nEscolha uma opção no teclado abaixo:", 
-        parse_mode="HTML", 
-        reply_markup=markup
-    )
+    btn_posicoes = InlineKeyboardButton("📊 Posições Abertas", callback_data="ver_posicoes")
+    btn_sinais = InlineKeyboardButton("📡 ÚLTIMOS SINAIS", callback_data="ver_sinais")
+    btn_relatorio = InlineKeyboardButton("📈 Relatório Diário", callback_data="ver_relatorio")
+    btn_abrir = InlineKeyboardButton("⚡ Abrir Ordem", callback_data="abrir_ordem")
+    btn_fechar = InlineKeyboardButton("❌ Fechar Posição", callback_data="fechar_ordem")
+    btn_refresh = InlineKeyboardButton("🔄 Atualizar Painel", callback_data="refresh_painel")
+    
+    markup.add(btn_posicoes, btn_sinais)
+    markup.add(btn_relatorio, btn_abrir)
+    markup.add(btn_fechar, btn_refresh)
+    return markup
 
-@bot.message_handler(func=lambda msg: msg.text == '📊 Status' or msg.text == '/status')
-def cmd_status(message):
-    estado = "🟢 <b>ANALISANDO</b>" if bot_rodando else "🔴 <b>PAUSADO</b>"
-    ativas = sum(1 for p in posicoes.values() if p['ativa'])
+def criar_menu_fechar_posicoes():
+    markup = InlineKeyboardMarkup(row_width=1)
+    for pos in POSICOES_ABERTAS:
+        symbol = pos["symbol"]
+        side = pos["side"]
+        pnl = pos["pnl"]
+        btn_text = f"❌ Fechar {symbol} ({side}) | PnL: {pnl}"
+        callback = f"close_pos_{symbol.replace('/', '_')}"
+        markup.add(InlineKeyboardButton(btn_text, callback_data=callback))
+    
+    markup.add(InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="refresh_painel"))
+    return markup
+
+# ==============================================================================
+# 4. LÓGICA DO RELATÓRIO DIÁRIO
+# ==============================================================================
+def gerar_texto_relatorio():
+    data_hoje = datetime.now().strftime("%d/%m/%Y")
+    
+    total_trades = len(HISTORICO_HOJE)
+    vitorias = sum(1 for t in HISTORICO_HOJE if t["result"] == "PROFIT")
+    derrotas = sum(1 for t in HISTORICO_HOJE if t["result"] == "LOSS")
+    winrate = (vitorias / total_trades * 100) if total_trades > 0 else 0
+    lucro_total = sum(t["lucro_usd"] for t in HISTORICO_HOJE)
+    
+    status_emoji = "🟢" if lucro_total >= 0 else "🔴"
     
     texto = (
-        f"📊 <b>STATUS DO SISTEMA</b>\n\n"
-        f"• Estado do Bot: {estado}\n"
-        f"• Pares Monitorados: {len(SYMBOLS)}\n"
-        f"• Operações Ativas: {ativas}\n"
-        f"• Trailing Stop: {TS_PCT}%\n"
+        f"📈 **RELATÓRIO DIÁRIO DE OPERAÇÕES**\n"
+        f"📅 **Data:** `{data_hoje}`\n"
+        f"🎯 **Canal/Grupo:** `{CHAT_ID}`\n"
+        f"───────────────────────────\n\n"
+        f"📊 **RESUMO DA SESSÃO:**\n"
+        f"• Total de Operações: `{total_trades}`\n"
+        f"• Vitórias (Take Profit): `🟢 {vitorias}`\n"
+        f"• Derrotas (Stop Loss): `🔴 {derrotas}`\n"
+        f"• Taxa de Assertividade: `{winrate:.1f}%`\n"
+        f"• Resultado Financeiro: {status_emoji} **${lucro_total:+.2f} USDT**\n\n"
+        f"📝 **DETALHAMENTO DOS TRADES:**\n"
     )
-    bot.reply_to(message, texto, parse_mode="HTML")
-
-@bot.message_handler(func=lambda msg: msg.text == '📂 Posições Abertas' or msg.text == '/posicoes')
-def cmd_posicoes(message):
-    texto = "📂 <b>POSIÇÕES ATIVAS NO MOMENTO:</b>\n\n"
-    encontrou = False
     
-    for symbol, pos in posicoes.items():
-        if pos['ativa']:
-            encontrou = True
-            clean_sym = symbol.replace('/', '').replace(':USDT', '')
-            texto += f"• <b>#{clean_sym}</b> | {pos['tipo']} | Entrada: ${pos['entrada']:.6f} | Stop: ${pos['ts_price']:.6f}\n"
-            
-    if not encontrou:
-        texto += "<i>Nenhuma posição aberta no momento.</i>"
+    for idx, trade in enumerate(HISTORICO_HOJE, 1):
+        icon = "✅" if trade["result"] == "PROFIT" else "❌"
+        texto += f"{idx}. {icon} **{trade['symbol']}** ({trade['side']}) → `{trade['pnl']}` (${trade['lucro_usd']:+.2f})\n"
         
-    bot.reply_to(message, texto, parse_mode="HTML")
+    texto += "\n_Relatório gerado automaticamente pelo bot._"
+    return texto
 
-@bot.message_handler(func=lambda msg: msg.text == '⏸️ Pausar Bot' or msg.text == '/pausar')
-def cmd_pausar(message):
-    global bot_rodando
-    bot_rodando = False
-    bot.reply_to(message, "⏸️ <b>Varredura de sinais PAUSADA!</b>\nAs posições abertas continuam sendo monitoradas.", parse_mode="HTML")
+# ==============================================================================
+# 5. HANDLERS DOS COMANDOS (/start, /posicoes, /relatorio, /sinais, /ajuda)
+# ==============================================================================
+@bot.message_handler(commands=['start'])
+def command_start(message):
+    texto = (
+        "🤖 **PAINEL DE TRADING PROFISSIONAL**\n\n"
+        "Sistema operacional ativo e conectado!\n"
+        "Selecione uma ação no menu abaixo:"
+    )
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown", reply_markup=criar_menu_principal())
 
-@bot.message_handler(func=lambda msg: msg.text == '▶️ Iniciar Bot' or msg.text == '/iniciar')
-def cmd_iniciar(message):
-    global bot_rodando
-    bot_rodando = True
-    bot.reply_to(message, "▶️ <b>Varredura REINICIADA!</b> Buscando novos cruzamentos em M1...", parse_mode="HTML")
+@bot.message_handler(commands=['posicoes'])
+def command_posicoes(message):
+    exibir_posicoes(message.chat.id)
 
-# Gerenciador do Botão Inline de "Fechar Posição"
-@bot.callback_query_handler(func=lambda call: call.data.startswith('close_'))
-def callback_close_position(call):
-    symbol_code = call.data.replace('close_', '')
-    target_symbol = None
-    
-    for sym in SYMBOLS:
-        if sym.replace('/', '').replace(':USDT', '') == symbol_code:
-            target_symbol = sym
-            break
-            
-    if target_symbol and posicoes[target_symbol]['ativa']:
-        posicoes[target_symbol]['ativa'] = False
-        bot.answer_callback_query(call.id, text=f"Posição {symbol_code} encerrada manualmente!")
-        bot.send_message(CHAT_ID, f"🛑 <b>OPERAÇÃO ENCERRADA MANUALLY</b> em #{symbol_code} via painel do Telegram.", parse_mode="HTML")
-    else:
-        bot.answer_callback_query(call.id, text="Essa posição já não está mais ativa.")
+@bot.message_handler(commands=['relatorio'])
+def command_relatorio(message):
+    texto = gerar_texto_relatorio()
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown", reply_markup=criar_menu_principal())
 
-def escutar_telegram():
-    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+@bot.message_handler(commands=['sinais'])
+def command_sinais(message):
+    exibir_sinais(message.chat.id)
 
-threading.Thread(target=escutar_telegram, daemon=True).start()
+@bot.message_handler(commands=['ajuda'])
+def command_ajuda(message):
+    texto = (
+        "❓ **AJUDA & COMANDOS**\n\n"
+        "• `/start` - Abre o painel interativo\n"
+        "• `/posicoes` - Consulta operações abertas\n"
+        "• `/relatorio` - Exibe o relatório de performance do dia\n"
+        "• `/sinais` - Mostra os últimos alertas do sistema"
+    )
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
 
-# ======================================================
-# 3. DUMMY SERVER & AUTO-PING PARA O RENDER
-# ======================================================
-class DummyHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot Scalper M1 Interativo Ativo!")
-    def log_message(self, format, *args): return
+# ==============================================================================
+# 6. HANDLER DE BOTÕES (CALLBACK QUERIES)
+# ==============================================================================
+@bot.callback_query_handler(func=lambda call: True)
+def callback_listener(call):
+    chat_id = call.message.chat.id
+    message_id = call.message.message_id
 
-def run_dummy_server():
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(('0.0.0.0', port), DummyHandler)
-    server.serve_forever()
+    if call.data == "ver_posicoes":
+        exibir_posicoes(chat_id)
+        bot.answer_callback_query(call.id, "Posições carregadas!")
 
-threading.Thread(target=run_dummy_server, daemon=True).start()
+    elif call.data == "ver_relatorio":
+        texto = gerar_texto_relatorio()
+        bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=criar_menu_principal())
+        bot.answer_callback_query(call.id, "Relatório Diário Gerado!")
 
-def keep_alive():
-    while True:
+    elif call.data == "ver_sinais":
+        exibir_sinais(chat_id)
+        bot.answer_callback_query(call.id, "Sinais carregados!")
+
+    elif call.data == "abrir_ordem":
+        bot.send_message(chat_id, "⚡ **ORDEM RÁPIDA**\n\nEnvie o comando no formato:\n`COMPRA BTCUSDT 0.01` ou `VENDA ETHUSDT 0.1`", parse_mode="Markdown")
+        bot.answer_callback_query(call.id)
+
+    elif call.data == "fechar_ordem":
+        if not POSICOES_ABERTAS:
+            bot.send_message(chat_id, "ℹ️ Nenhuma posição aberta para fechar no momento.")
+        else:
+            bot.send_message(chat_id, "🎯 **Selecione qual posição deseja fechar:**", reply_markup=criar_menu_fechar_posicoes())
+        bot.answer_callback_query(call.id)
+
+    elif call.data == "refresh_painel":
+        texto = "🔄 **Painel Atualizado com Sucesso!**\nEscolha uma opção abaixo:"
         try:
-            time.sleep(600)
-            if "seu-bot" not in RENDER_URL:
-                requests.get(RENDER_URL, timeout=10)
-        except Exception as e:
-            print(f"Erro auto-ping: {e}")
+            bot.edit_message_text(texto, chat_id, message_id, parse_mode="Markdown", reply_markup=criar_menu_principal())
+        except Exception:
+            bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=criar_menu_principal())
+        bot.answer_callback_query(call.id)
 
-threading.Thread(target=keep_alive, daemon=True).start()
+    elif call.data.startswith("close_pos_"):
+        symbol_raw = call.data.replace("close_pos_", "").replace("_", "/")
+        global POSICOES_ABERTAS
+        POSICOES_ABERTAS = [p for p in POSICOES_ABERTAS if p["symbol"] != symbol_raw]
+        
+        bot.send_message(chat_id, f"✅ **Posição em {symbol_raw} encerrada com sucesso!**", parse_mode="Markdown")
+        bot.answer_callback_query(call.id, f"{symbol_raw} Fechado!")
 
-# ======================================================
-# 4. AUXILIARES E LÓGICA DE MERCADO
-# ======================================================
-def enviar_telegram_com_botao(mensagem, symbol_code):
-    markup = types.InlineKeyboardMarkup()
-    btn_fechar = types.InlineKeyboardButton("❌ Fechar Posição", callback_data=f"close_{symbol_code}")
-    markup.add(btn_fechar)
+# ==============================================================================
+# 7. FUNÇÕES AUXILIARES DE EXIBIÇÃO
+# ==============================================================================
+def exibir_posicoes(chat_id):
+    if not POSICOES_ABERTAS:
+        bot.send_message(chat_id, "📊 **POSIÇÕES:**\nNenhuma ordem aberta no momento.")
+        return
+
+    texto = "📊 **POSIÇÕES ABERTAS EM TEMPO REAL:**\n\n"
+    for idx, pos in enumerate(POSICOES_ABERTAS, 1):
+        emoji = "🟢" if pos["side"] == "LONG" else "🔴"
+        texto += (
+            f"{idx}. {emoji} **{pos['symbol']}** ({pos['side']})\n"
+            f"   • Entrada: `${pos['entry']}`\n"
+            f"   • Qtd: `{pos['qty']}`\n"
+            f"   • PnL Atual: **{pos['pnl']}**\n\n"
+        )
+    bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=criar_menu_principal())
+
+def exibir_sinais(chat_id):
+    texto = (
+        "📡 **ÚLTIMO SINAL DETECTADO**\n\n"
+        "🎯 **Ativo:** BTC/USDT\n"
+        "📈 **Direção:** LONG (Compra)\n"
+        "💵 **Entrada:** 64,150.00\n"
+        "🎯 **Alvo 1:** 65,200.00\n"
+        "🎯 **Alvo 2:** 66,500.00\n"
+        "🛑 **Stop Loss:** 63,200.00\n\n"
+        "_Status: Sinal ativo e monitorado._"
+    )
+    bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=criar_menu_principal())
+
+# ==============================================================================
+# 8. EXECUÇÃO PRINCIPAL
+# ==============================================================================
+if __name__ == "__main__":
+    print("🤖 Iniciando Bot de Trading no Render...")
+    inicializar_bot()
+    print(f"🚀 Bot Ativo no Chat ID: {CHAT_ID}")
     
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": mensagem,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True,
-        "reply_markup": markup.to_json()
-    }
-    try:
-        requests.post(url, json=payload, timeout=5)
-    except Exception as e:
-        print(f"Erro ao enviar Telegram: {e}")
-
-def enviar_telegram_simples(mensagem):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": mensagem,
-        "parse_mode": "HTML"
-    }
-    try:
-        requests.post(url, json=payload, timeout=5)
-    except Exception as e:
-        print(f"Erro ao enviar Telegram: {e}")
-
-def calcular_indicadores(df):
-    df['ema_fast'] = df['close'].ewm(span=9, adjust=False).mean()
-    df['ema_slow'] = df['close'].ewm(span=21, adjust=False).mean()
-    
-    delta = df['close'].diff()
-    gain = delta.clip(lower=0)
-    loss = -1 * delta.clip(upper=0)
-    ema_gain = gain.ewm(com=13, adjust=False).mean()
-    ema_loss = loss.ewm(com=13, adjust=False).mean()
-    rs = ema_gain / ema_loss
-    df['rsi'] = 100 - (100 / (1 + rs))
-    return df
-
-def analisar_e_executar():
-    for symbol in SYMBOLS:
-        try:
-            bars = exchange.fetch_ohlcv(symbol, timeframe=TIMEFRAME, limit=60)
-            df = pd.DataFrame(bars, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            df = calcular_indicadores(df)
-
-            ultima_fechada = df.iloc[-2]
-            penultima = df.iloc[-3]
-            preco_atual = df.iloc[-1]['close']
-            high_atual = df.iloc[-1]['high']
-            low_atual = df.iloc[-1]['low']
-
-            pos = posicoes[symbol]
-            hashtag = symbol.replace('/', '').replace(':USDT', '')
-
-            # GERENCIAMENTO DE POSIÇÃO (TRAILING STOP)
-            if pos['ativa']:
-                if pos['tipo'] == 'BUY':
-                    novo_ts = high_atual * (1 - (TS_PCT / 100))
-                    pos['ts_price'] = max(pos['ts_price'], novo_ts)
-
-                    if low_atual <= pos['ts_price']:
-                        pnl = ((pos['ts_price'] - pos['entrada']) / pos['entrada']) * 100
-                        resultado_str = "<b>WIN</b> 🎯" if pnl > 0 else "<b>LOSS</b> ❌"
-                        cor_emoji = "🟢" if pnl > 0 else "🔴"
-
-                        msg_resultado = (
-                            f"{cor_emoji} <b>OPERAÇÃO ENCERRADA M1</b> | #{hashtag}\n\n"
-                            f"📌 <b>Tipo:</b> LONG\n"
-                            f"🏁 <b>Resultado:</b> {resultado_str} ({pnl:+.2f}%)\n"
-                            f"📥 <b>Entrada:</b> ${pos['entrada']:.6f}\n"
-                            f"📤 <b>Saída:</b> ${pos['ts_price']:.6f}"
-                        )
-                        enviar_telegram_simples(msg_resultado)
-                        pos['ativa'] = False
-
-                elif pos['tipo'] == 'SELL':
-                    novo_ts = low_atual * (1 + (TS_PCT / 100))
-                    pos['ts_price'] = min(pos['ts_price'], novo_ts)
-
-                    if high_atual >= pos['ts_price']:
-                        pnl = ((pos['entrada'] - pos['ts_price']) / pos['entrada']) * 100
-                        resultado_str = "<b>WIN</b> 🎯" if pnl > 0 else "<b>LOSS</b> ❌"
-                        cor_emoji = "🟢" if pnl > 0 else "🔴"
-
-                        msg_resultado = (
-                            f"{cor_emoji} <b>OPERAÇÃO ENCERRADA M1</b> | #{hashtag}\n\n"
-                            f"📌 <b>Tipo:</b> SHORT\n"
-                            f"🏁 <b>Resultado:</b> {resultado_str} ({pnl:+.2f}%)\n"
-                            f"📥 <b>Entrada:</b> ${pos['entrada']:.6f}\n"
-                            f"📤 <b>Saída:</b> ${pos['ts_price']:.6f}"
-                        )
-                        enviar_telegram_simples(msg_resultado)
-                        pos['ativa'] = False
-
-            # GERAÇÃO DE NOVOS SINAIS
-            elif bot_rodando:
-                cruzou_alta = (penultima['ema_fast'] <= penultima['ema_slow']) and (ultima_fechada['ema_fast'] > ultima_fechada['ema_slow'])
-                cruzou_baixa = (penultima['ema_fast'] >= penultima['ema_slow']) and (ultima_fechada['ema_fast'] < ultima_fechada['ema_slow'])
-
-                if cruzou_alta and ultima_fechada['rsi'] > 50:
-                    pos['ativa'] = True
-                    pos['tipo'] = 'BUY'
-                    pos['entrada'] = preco_atual
-                    pos['ts_price'] = preco_atual * (1 - (TS_PCT / 100))
-
-                    msg_sinal = (
-                        f"⚡ <b>SINAL M1 ULTRA SCALPER</b> | #{hashtag}\n\n"
-                        f"📊 <b>Direção:</b> 🟢 <b>LONG (COMPRA)</b>\n"
-                        f"💵 <b>Entrada:</b> ${preco_atual:.6f}\n"
-                        f"🛡 <b>Trailing Stop:</b> ${pos['ts_price']:.6f} ({TS_PCT}%)\n\n"
-                        f"🔥 <i>EMA 9x21 Cruzou para CIMA | RSI: {ultima_fechada['rsi']:.1f}</i>"
-                    )
-                    enviar_telegram_com_botao(msg_sinal, hashtag)
-
-                elif cruzou_baixa and ultima_fechada['rsi'] < 50:
-                    pos['ativa'] = True
-                    pos['tipo'] = 'SELL'
-                    pos['entrada'] = preco_atual
-                    pos['ts_price'] = preco_atual * (1 + (TS_PCT / 100))
-
-                    msg_sinal = (
-                        f"⚡ <b>SINAL M1 ULTRA SCALPER</b> | #{hashtag}\n\n"
-                        f"📊 <b>Direção:</b> 🔴 <b>SHORT (VENDA)</b>\n"
-                        f"💵 <b>Entrada:</b> ${preco_atual:.6f}\n"
-                        f"🛡 <b>Trailing Stop:</b> ${pos['ts_price']:.6f} ({TS_PCT}%)\n\n"
-                        f"🔥 <i>EMA 9x21 Cruzou para BAIXO | RSI: {ultima_fechada['rsi']:.1f}</i>"
-                    )
-                    enviar_telegram_com_botao(msg_sinal, hashtag)
-
-        except Exception as e:
-            print(f"Erro em {symbol}: {e}")
-
-        time.sleep(1.2)
-
-print("==========================================")
-print("BOT M1 INTERATIVO FULL INICIADO!")
-print("==========================================")
-
-enviar_telegram_simples("🤖 <b>BOT M1 SCALPER ONLINE COM PAINEL INTERATIVO!</b>\n\nEnvie /menu no chat para ver os comandos.")
-
-while True:
-    analisar_e_executar()
-    time.sleep(10)
-                     
+    # Executa o polling descartando requisições pendentes antigas
+    bot.infinity_polling(skip_pending=True)
