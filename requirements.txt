@@ -1,3 +1,4 @@
+pytelegrambotapi
 ccxt
 pandas
 requests
