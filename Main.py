@@ -153,7 +153,7 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
 
 def motor_loop_estrategia():
     """Gera sinais automáticos em M1 consultando a Binance."""
-    pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT", "AVAX/USDT", "DOGE/USDT"]
+    pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT", "AVAX/USDT", "DOGE/USDT, "OP/USDT", "ARB/USDT", "BNB/USDT"]
     
     # Aguarda 10 segundos ao ligar o bot
     time.sleep(10)
