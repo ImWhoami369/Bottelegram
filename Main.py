@@ -33,7 +33,7 @@ def keep_alive():
 # 2. CREDENCIAIS E API PÚBLICA DA BINANCE
 # ==============================================================================
 TOKEN = "8822381506:AAEFA9KscOVs_xIGOV70RJeuLPggQNojYXg"
-CHAT_ID = "-1003966783268"
+CHAT_ID = "-1003915020968"
 
 bot = telebot.TeleBot(TOKEN)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
