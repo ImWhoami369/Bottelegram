@@ -45,6 +45,8 @@ binance = ccxt.binance({'enableRateLimit': True})
 POSICOES_ABERTAS = []
 HISTORICO_HOJE = []
 
+ITENS_POR_PAGINA = 10  # Quantidade de sinais por página para evitar estouro de 4096 caracteres
+
 def obter_preco_real_binance(symbol):
     """Busca o preço exato e atualizado diretamente na API pública da Binance."""
     try:
@@ -136,6 +138,10 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
         "pnl": f"{pnl_percent:+.2f}%",
         "lucro_usd": lucro_usd
     })
+
+    # Limite máximo de retenção no histórico para salvar consumo de RAM (mantém apenas os últimos 500)
+    if len(HISTORICO_HOJE) > 500:
+        HISTORICO_HOJE = HISTORICO_HOJE[-500:]
     
     # 3. Envia mensagem de encerramento no Telegram
     status_emoji = "🟢 TAKEN PROFIT (Vitória!)" if is_profit else "🔴 STOP LOSS (Derrota)"
@@ -154,7 +160,6 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
 def motor_loop_estrategia():
     """Gera sinais automáticos em M1 consultando a Binance."""
     pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT", "AVAX/USDT", "DOGE/USDT", "BNB/USDT"]    
-    # Aguarda 10 segundos ao ligar o bot
     time.sleep(10)
     
     while True:
@@ -164,7 +169,6 @@ def motor_loop_estrategia():
         logging.info(f"🤖 Motor 1M gerou novo sinal real da Binance para {par}")
         processar_sinal_automatico(par, lado, CHAT_ID)
         
-        # Aguarda de 60 a 90 segundos para o próximo sinal
         tempo_espera = random.randint(60, 90)
         time.sleep(tempo_espera)
 
@@ -194,7 +198,7 @@ def inicializar_bot():
         logging.error(f"⚠️ Erro ao inicializar bot: {e}")
 
 # ==============================================================================
-# 5. MENUS E TECLADOS INLINE
+# 5. MENUS E TECLADOS INLINE COM SUPORTE A PAGINAÇÃO
 # ==============================================================================
 def criar_menu_principal():
     markup = InlineKeyboardMarkup(row_width=2)
@@ -203,7 +207,7 @@ def criar_menu_principal():
         InlineKeyboardButton("📡 ÚLTIMOS SINAIS", callback_data="ver_sinais")
     )
     markup.add(
-        InlineKeyboardButton("📈 Relatório Diário", callback_data="ver_relatorio"),
+        InlineKeyboardButton("📈 Relatório Diário", callback_data="relatorio_pag_1"),
         InlineKeyboardButton("⚡ Simular Sinal (1m)", callback_data="disparar_sinal_teste")
     )
     markup.add(
@@ -224,7 +228,26 @@ def criar_menu_fechar_posicoes():
     markup.add(InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="refresh_painel"))
     return markup
 
-def gerar_texto_relatorio():
+def criar_teclado_paginacao(pagina_atual, total_paginas):
+    """Cria os botões de navegação para alternar entre páginas do relatório."""
+    markup = InlineKeyboardMarkup(row_width=3)
+    botoes_nav = []
+
+    if pagina_atual > 1:
+        botoes_nav.append(InlineKeyboardButton("◀️ Anterior", callback_data=f"relatorio_pag_{pagina_atual - 1}"))
+    
+    botoes_nav.append(InlineKeyboardButton(f"📄 {pagina_atual}/{total_paginas}", callback_data="ignore_click"))
+
+    if pagina_atual < total_paginas:
+        botoes_nav.append(InlineKeyboardButton("Próximo ▶️", callback_data=f"relatorio_pag_{pagina_atual + 1}"))
+
+    markup.add(*botoes_nav)
+    markup.add(InlineKeyboardButton("🔄 Atualizar", callback_data=f"relatorio_pag_{pagina_atual}"),
+               InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="refresh_painel"))
+    return markup
+
+def gerar_texto_relatorio(pagina=1):
+    """Gera o texto paginado limitando 10 sinais por página para evitar o travamento."""
     data_hoje = datetime.now().strftime("%d/%m/%Y")
     total_trades = len(HISTORICO_HOJE)
     vitorias = sum(1 for t in HISTORICO_HOJE if t["result"] == "PROFIT")
@@ -233,6 +256,9 @@ def gerar_texto_relatorio():
     lucro_total = sum(t["lucro_usd"] for t in HISTORICO_HOJE)
     status_emoji = "🟢" if lucro_total >= 0 else "🔴"
     
+    total_paginas = max(1, (total_trades + ITENS_POR_PAGINA - 1) // ITENS_POR_PAGINA)
+    pagina = max(1, min(pagina, total_paginas))
+
     texto = (
         f"📈 **RELATÓRIO DIÁRIO DE OPERAÇÕES (1M BINANCE)**\n"
         f"📅 **Data:** `{data_hoje}`\n"
@@ -244,13 +270,23 @@ def gerar_texto_relatorio():
         f"• Derrotas (Stop Loss): `🔴 {derrotas}`\n"
         f"• Taxa de Assertividade: `{winrate:.1f}%`\n"
         f"• Resultado Financeiro: {status_emoji} **${lucro_total:+.2f} USDT**\n\n"
-        f"📝 **DETALHAMENTO DOS TRADES:**\n"
+        f"📝 **DETALHAMENTO DOS TRADES (Página {pagina}/{total_paginas}):**\n"
     )
-    for idx, trade in enumerate(HISTORICO_HOJE, 1):
-        icon = "✅" if trade["result"] == "PROFIT" else "❌"
-        texto += f"{idx}. {icon} **{trade['symbol']}** ({trade['side']}) → `{trade['pnl']}` (${trade['lucro_usd']:+.2f})\n"
+
+    if total_trades == 0:
+        texto += "_Nenhum trade registrado no histórico até o momento._"
+    else:
+        # Pega a fatia do histórico correspondente à página selecionada
+        inicio = (pagina - 1) * ITENS_POR_PAGINA
+        fim = inicio + ITENS_POR_PAGINA
+        trades_pagina = HISTORICO_HOJE[inicio:fim]
+
+        for idx, trade in enumerate(trades_pagina, start=inicio + 1):
+            icon = "✅" if trade["result"] == "PROFIT" else "❌"
+            texto += f"{idx}. {icon} **{trade['symbol']}** ({trade['side']}) → `{trade['pnl']}` (${trade['lucro_usd']:+.2f})\n"
+
     texto += "\n_Relatório gerado com cotações reais da Binance._"
-    return texto
+    return texto, total_paginas
 
 # ==============================================================================
 # 6. HANDLERS DOS COMANDOS
@@ -273,7 +309,8 @@ def command_posicoes(message):
 
 @bot.message_handler(commands=['relatorio'])
 def command_relatorio(message):
-    bot.send_message(message.chat.id, gerar_texto_relatorio(), parse_mode="Markdown", reply_markup=criar_menu_principal())
+    texto, total_paginas = gerar_texto_relatorio(pagina=1)
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown", reply_markup=criar_teclado_paginacao(1, total_paginas))
 
 @bot.message_handler(commands=['sinais'])
 def command_sinais(message):
@@ -293,12 +330,23 @@ def callback_listener(call):
     chat_id = call.message.chat.id
     message_id = call.message.message_id
 
+    if call.data == "ignore_click":
+        bot.answer_callback_query(call.id)
+        return
+
     if call.data == "ver_posicoes":
         exibir_posicoes(chat_id)
         bot.answer_callback_query(call.id)
 
-    elif call.data == "ver_relatorio":
-        bot.send_message(chat_id, gerar_texto_relatorio(), parse_mode="Markdown", reply_markup=criar_menu_principal())
+    elif call.data.startswith("relatorio_pag_"):
+        pagina = int(call.data.replace("relatorio_pag_", ""))
+        texto, total_paginas = gerar_texto_relatorio(pagina=pagina)
+        markup = criar_teclado_paginacao(pagina, total_paginas)
+        
+        try:
+            bot.edit_message_text(texto, chat_id, message_id, parse_mode="Markdown", reply_markup=markup)
+        except Exception:
+            bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=markup)
         bot.answer_callback_query(call.id)
 
     elif call.data == "disparar_sinal_teste":
@@ -365,3 +413,4 @@ if __name__ == "__main__":
     
     # Inicia o polling no Telegram
     bot.infinity_polling(skip_pending=True)
+    
