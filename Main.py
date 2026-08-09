@@ -45,7 +45,7 @@ binance = ccxt.binance({'enableRateLimit': True})
 POSICOES_ABERTAS = []
 HISTORICO_HOJE = []
 
-ITENS_POR_PAGINA = 10  # Quantidade de sinais por página para evitar estouro de 4096 caracteres
+ITENS_POR_PAGINA = 30  # Quantidade de sinais por página para evitar estouro de 4096 caracteres
 
 def obter_preco_real_binance(symbol):
     """Busca o preço exato e atualizado diretamente na API pública da Binance."""
@@ -160,7 +160,7 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
 def motor_loop_estrategia():
     """Gera sinais automáticos em M1 consultando a Binance."""
     pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT", "AVAX/USDT", "DOGE/USDT", "BNB/USDT"]    
-    time.sleep(10)
+    time.sleep(60)
     
     while True:
         par = random.choice(pares)
@@ -247,7 +247,7 @@ def criar_teclado_paginacao(pagina_atual, total_paginas):
     return markup
 
 def gerar_texto_relatorio(pagina=1):
-    """Gera o texto paginado limitando 10 sinais por página para evitar o travamento."""
+    """Gera o texto paginado limitando 30 sinais por página para evitar o travamento."""
     data_hoje = datetime.now().strftime("%d/%m/%Y")
     total_trades = len(HISTORICO_HOJE)
     vitorias = sum(1 for t in HISTORICO_HOJE if t["result"] == "PROFIT")
