@@ -124,7 +124,7 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
         pnl_percent = ((entry_price - exit_price) / entry_price) * 100
         
     is_profit = pnl_percent > 0
-    lucro_usd = round(pnl_percent * 10, 2) # Simulação de $100 de margem a 10x
+    lucro_usd = round(pnl_percent * 100, 2) # Simulação de $100 de margem a 10x
     result_str = "PROFIT" if is_profit else "LOSS"
     
     # 1. Remove da lista de Posições Abertas
@@ -140,8 +140,8 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
     })
 
     # Limite máximo de retenção no histórico para salvar consumo de RAM (mantém apenas os últimos 500)
-    if len(HISTORICO_HOJE) > 500:
-        HISTORICO_HOJE = HISTORICO_HOJE[-500:]
+    if len(HISTORICO_HOJE) > 1500:
+        HISTORICO_HOJE = HISTORICO_HOJE[-1500:]
     
     # 3. Envia mensagem de encerramento no Telegram
     status_emoji = "🟢 TAKEN PROFIT (Vitória!)" if is_profit else "🔴 STOP LOSS (Derrota)"
@@ -159,7 +159,7 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
 
 def motor_loop_estrategia():
     """Gera sinais automáticos em M1 consultando a Binance."""
-    pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT", "AVAX/USDT", "DOGE/USDT", "BNB/USDT"]    
+    pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT", "AVAX/USDT", "DOGE/USDT", "BNB/USDT", "XRP/USDT", "ADA/USDT", "HBAR/USDT", "LINK/USDT"]    
     time.sleep(60)
     
     while True:
