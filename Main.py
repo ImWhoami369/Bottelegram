@@ -45,7 +45,7 @@ binance = ccxt.binance({'enableRateLimit': True})
 POSICOES_ABERTAS = []
 HISTORICO_HOJE = []
 
-ITENS_POR_PAGINA = 30  # Quantidade de sinais por página para evitar estouro de 4096 caracteres
+ITENS_POR_PAGINA = 50  # Quantidade de sinais por página para evitar estouro de 4096 caracteres
 
 def obter_preco_real_binance(symbol):
     """Busca o preço exato e atualizado diretamente na API pública da Binance."""
@@ -119,12 +119,12 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
     
     # Calcula variação percentual real do mercado
     if side == "LONG":
-        pnl_percent = ((exit_price - entry_price) / entry_price) * 100
+        pnl_percent = ((exit_price - entry_price) / entry_price) * 10
     else:
-        pnl_percent = ((entry_price - exit_price) / entry_price) * 100
+        pnl_percent = ((entry_price - exit_price) / entry_price) * 10
         
     is_profit = pnl_percent > 0
-    lucro_usd = round(pnl_percent * 100, 2) # Simulação de $100 de margem a 10x
+    lucro_usd = round(pnl_percent * 10, 6) # Simulação de $100 de margem a 10x
     result_str = "PROFIT" if is_profit else "LOSS"
     
     # 1. Remove da lista de Posições Abertas
@@ -297,7 +297,7 @@ def command_start(message):
 
 @bot.message_handler(commands=['testar_sinal'])
 def command_testar_sinal(message):
-    pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT", "AVAX/USDT"]
+    pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "DOGE/USDT", "AVAX/USDT"]
     par = random.choice(pares)
     lado = random.choice(["LONG", "SHORT"])
     
@@ -350,7 +350,7 @@ def callback_listener(call):
         bot.answer_callback_query(call.id)
 
     elif call.data == "disparar_sinal_teste":
-        pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT"]
+        pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "DOGE/USDT"]
         par = random.choice(pares)
         lado = random.choice(["LONG", "SHORT"])
         
