@@ -119,12 +119,12 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
     
     # Calcula variação percentual real do mercado
     if side == "LONG":
-        pnl_percent = ((exit_price - entry_price) / entry_price) * 10
+        pnl_percent = ((exit_price - entry_price) / entry_price) * 250
     else:
-        pnl_percent = ((entry_price - exit_price) / entry_price) * 10
+        pnl_percent = ((entry_price - exit_price) / entry_price) * 250
         
     is_profit = pnl_percent > 0
-    lucro_usd = round(pnl_percent * 10, 6) # Simulação de $100 de margem a 10x
+    lucro_usd = round(pnl_percent * 50, 6) # Simulação de $100 de margem a 10x
     result_str = "PROFIT" if is_profit else "LOSS"
     
     # 1. Remove da lista de Posições Abertas
