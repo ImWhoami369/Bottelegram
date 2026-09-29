@@ -39,7 +39,7 @@ bot = telebot.TeleBot(TOKEN)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Conexão PÚBLICA com a Binance (não exige chave nem login)
-binance = ccxt.binance({'enableRateLimit': True})
+binance = ccxt.bybit({'enableRateLimit': True})
 
 # --- POSIÇÕES ABERTAS E HISTÓRICO ---
 POSICOES_ABERTAS = []
