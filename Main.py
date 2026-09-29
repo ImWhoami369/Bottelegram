@@ -34,6 +34,7 @@ def keep_alive():
 # ==============================================================================
 TOKEN = os.environ.get("BOT_TOKEN", "8822381506:AAGIL1COPRvbczxV95jBuxD3EIyFD5VBzUs")
 bot = telebot.TeleBot(TOKEN)
+CHAT_ID = "-1004442863660"
 
 # Conexão PÚBLICA com a Binance (não exige chave nem login)
 binance = ccxt.binance({'enableRateLimit': True})
