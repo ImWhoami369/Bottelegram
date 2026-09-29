@@ -100,7 +100,7 @@ def processar_sinal_automatico(symbol, side, target_chat_id):
     bot.send_message(target_chat_id, texto_abertura, parse_mode="Markdown")
     
     # 3. Temporizador exato de 60 segundos em segundo plano
-    threading.Timer(60.0, finalizar_sinal_automatico, args=[symbol, side, entry_price, target_chat_id]).start()
+    threading.Timer(63.0, finalizar_sinal_automatico, args=[symbol, side, entry_price, target_chat_id]).start()
 
 def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
     """Executado após 60s: Puxa o preço real atualizado da Binance e calcula o PnL real."""
