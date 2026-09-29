@@ -32,8 +32,8 @@ def keep_alive():
 # ==============================================================================
 # 2. CREDENCIAIS E API PÚBLICA DA BINANCE
 # ==============================================================================
-TOKEN = "8822381506:AAGIL1COPRvbczxV95jBuxD3EIyFD5VBzUs"
-CHAT_ID = "-1004442863660"
+TOKEN = os.environ.get("BOT_TOKEN", "8822381506:AAGIL1COPRvbczxV95jBuxD3EIyFD5VBzUs")
+bot = telebot.TeleBot(TOKEN)
 
 # Conexão PÚBLICA com a Binance (não exige chave nem login)
 binance = ccxt.binance({'enableRateLimit': True})
