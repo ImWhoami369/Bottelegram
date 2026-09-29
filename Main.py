@@ -35,11 +35,8 @@ def keep_alive():
 TOKEN = "8822381506:AAGIL1COPRvbczxV95jBuxD3EIyFD5VBzUs"
 CHAT_ID = "-1004442863660"
 
-bot = telebot.TeleBot(TOKEN)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 # Conexão PÚBLICA com a Binance (não exige chave nem login)
-binance = ccxt.bybit({'enableRateLimit': True})
+binance = ccxt.binance({'enableRateLimit': True})
 
 # --- POSIÇÕES ABERTAS E HISTÓRICO ---
 POSICOES_ABERTAS = []
