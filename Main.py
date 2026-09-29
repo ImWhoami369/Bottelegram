@@ -32,7 +32,7 @@ def keep_alive():
 # ==============================================================================
 # 2. CREDENCIAIS E API PÚBLICA DA BINANCE
 # ==============================================================================
-TOKEN = "8822381506:AAEFA9KscOVs_xIGOV70RJeuLPggQNojYXg"
+TOKEN = "8822381506:AAGIL1COPRvbczxV95jBuxD3EIyFD5VBzUs"
 CHAT_ID = "-1004442863660"
 
 bot = telebot.TeleBot(TOKEN)
