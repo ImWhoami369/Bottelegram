@@ -295,7 +295,7 @@ def command_start(message):
 
 @bot.message_handler(commands=['testar_sinal'])
 def command_testar_sinal(message):
-    pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "DOGE/USDT", "AVAX/USDT"]
+    pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT", "AVAX/USDT", "DOGE/USDT", "BNB/USDT", "XRP/USDT", "ADA/USDT", "HBAR/USDT", "LINK/USDT"]
     par = random.choice(pares)
     lado = random.choice(["LONG", "SHORT"])
     
