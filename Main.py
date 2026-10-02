@@ -43,7 +43,7 @@ binance = ccxt.binance({'enableRateLimit': True})
 POSICOES_ABERTAS = []
 HISTORICO_HOJE = []
 
-ITENS_POR_PAGINA = 50  # Quantidade de sinais por página para evitar estouro de 4096 caracteres
+ITENS_POR_PAGINA = 100  # Quantidade de sinais por página para evitar estouro de 4096 caracteres
 
 def obter_preco_real_binance(symbol):
     """Busca o preço exato e atualizado diretamente na API pública da Binance."""
@@ -101,7 +101,7 @@ def processar_sinal_automatico(symbol, side, target_chat_id):
     bot.send_message(target_chat_id, texto_abertura, parse_mode="Markdown")
     
     # 3. Temporizador exato de 60 segundos em segundo plano
-    threading.Timer(63.0, finalizar_sinal_automatico, args=[symbol, side, entry_price, target_chat_id]).start()
+    threading.Timer(93.0, finalizar_sinal_automatico, args=[symbol, side, entry_price, target_chat_id]).start()
 
 def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
     """Executado após 60s: Puxa o preço real atualizado da Binance e calcula o PnL real."""
@@ -138,8 +138,8 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
     })
 
     # Limite máximo de retenção no histórico para salvar consumo de RAM (mantém apenas os últimos 500)
-    if len(HISTORICO_HOJE) > 1500:
-        HISTORICO_HOJE = HISTORICO_HOJE[-1500:]
+    if len(HISTORICO_HOJE) > 3333:
+        HISTORICO_HOJE = HISTORICO_HOJE[-3333:]
     
     # 3. Envia mensagem de encerramento no Telegram
     status_emoji = "🟢 TAKEN PROFIT (Vitória!)" if is_profit else "🔴 STOP LOSS (Derrota)"
