@@ -43,7 +43,7 @@ binance = ccxt.binance({'enableRateLimit': True})
 POSICOES_ABERTAS = []
 HISTORICO_HOJE = []
 
-ITENS_POR_PAGINA = 100  # Quantidade de sinais por página para evitar estouro de 4096 caracteres
+ITENS_POR_PAGINA = 60  # Quantidade de sinais por página para evitar estouro de 4096 caracteres
 
 def obter_preco_real_binance(symbol):
     """Busca o preço exato e atualizado diretamente na API pública da Binance."""
@@ -138,8 +138,8 @@ def finalizar_sinal_automatico(symbol, side, entry_price, target_chat_id):
     })
 
     # Limite máximo de retenção no histórico para salvar consumo de RAM (mantém apenas os últimos 500)
-    if len(HISTORICO_HOJE) > 3333:
-        HISTORICO_HOJE = HISTORICO_HOJE[-3333:]
+    if len(HISTORICO_HOJE) > 2500:
+        HISTORICO_HOJE = HISTORICO_HOJE[-2500:]
     
     # 3. Envia mensagem de encerramento no Telegram
     status_emoji = "🟢 TAKEN PROFIT (Vitória!)" if is_profit else "🔴 STOP LOSS (Derrota)"
@@ -295,7 +295,7 @@ def command_start(message):
 
 @bot.message_handler(commands=['testar_sinal'])
 def command_testar_sinal(message):
-    pares = ["CHZ/USDT", "BTC/USDT", "ETH/USDT", "SOL/USDT", "AVAX/USDT", "DOGE/USDT", "BNB/USDT", "XRP/USDT", "ADA/USDT", "HBAR/USDT", "LINK/USDT"]
+    pares = ["CHZ/USDT", "SOL/USDT", "AVAX/USDT", "DOGE/USDT", "BNB/USDT", "XRP/USDT", "ADA/USDT", "HBAR/USDT", "LINK/USDT"]
     par = random.choice(pares)
     lado = random.choice(["LONG", "SHORT"])
     
